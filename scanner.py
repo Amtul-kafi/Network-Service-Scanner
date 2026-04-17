@@ -1,16 +1,21 @@
 import socket
 import datetime
-import os
 from concurrent.futures import ThreadPoolExecutor, as_completed
-from serviceDetect import detect_service
+
+from core.serviceDetect import detect_service
+from core.report import ReportManager
 
 print("==== ScanopyB Professional TCP Scanner ====")
 
+# ---------------------------
+# INPUT
+# ---------------------------
 target = input("Enter target IP (e.g., 127.0.0.1): ").strip()
 port_input = input("Enter ports (e.g., 22,80,443 or 1-1024): ").strip()
 
+
 # ---------------------------
-# Port Parsing
+# PORT PARSER
 # ---------------------------
 def parse_ports(port_str):
     ports = set()
@@ -19,15 +24,18 @@ def parse_ports(port_str):
         start, end = port_str.split("-")
         for p in range(int(start), int(end) + 1):
             ports.add(p)
+
     elif "," in port_str:
         for p in port_str.split(","):
             ports.add(int(p.strip()))
+
     else:
         ports.add(int(port_str))
 
     return sorted(ports)
 
-if port_input == "":
+
+if not port_input:
     ports = list(range(1, 1025))
 else:
     try:
@@ -36,62 +44,64 @@ else:
         print("Invalid port format.")
         exit()
 
+
 # ---------------------------
-# Banner Grabber
+# BANNER GRABBER
 # ---------------------------
-def grab_banner(target, port):
+def grab_banner(ip, port):
     try:
         s = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
         s.settimeout(1)
-        s.connect((target, port))
+        s.connect((ip, port))
 
         # HTTP detection
         if port in [80, 8080, 8000, 8888]:
-            http_request = f"GET / HTTP/1.1\r\nHost: {target}\r\n\r\n"
-            s.send(http_request.encode())
+            req = f"GET / HTTP/1.1\r\nHost: {ip}\r\n\r\n"
+            s.send(req.encode())
             response = s.recv(4096).decode(errors="ignore")
 
             for line in response.split("\r\n"):
                 if "Server:" in line:
-                    s.close()
                     return line.strip()
 
-            s.close()
             return "HTTP service detected"
 
         banner = s.recv(1024).decode(errors="ignore").strip()
-        s.close()
 
-        if banner:
-            return banner
-        else:
-            return "No banner"
+        return banner if banner else "No banner"
 
     except:
         return None
 
+    finally:
+        try:
+            s.close()
+        except:
+            pass
+
+
 # ---------------------------
-# Port Scan Function
+# SCAN FUNCTION
 # ---------------------------
 def scan_port(port):
     try:
         s = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
         s.settimeout(1)
-        result = s.connect_ex((target, port))
-        s.close()
 
-        if result == 0:
+        if s.connect_ex((target, port)) == 0:
             service = detect_service(port)
             banner = grab_banner(target, port)
+
             return (port, service, banner)
 
     except:
-        return None
+        pass
 
     return None
 
+
 # ---------------------------
-# Scan Execution
+# EXECUTION
 # ---------------------------
 print(f"\nScanning {target} ({len(ports)} ports)...\n")
 
@@ -100,6 +110,7 @@ open_ports = []
 
 with ThreadPoolExecutor(max_workers=100) as executor:
     futures = [executor.submit(scan_port, port) for port in ports]
+
     for future in as_completed(futures):
         result = future.result()
 
@@ -119,36 +130,9 @@ duration = (end_time - start_time).total_seconds()
 print("\nScan complete!")
 print(f"Scan duration: {duration:.2f} seconds")
 
+
 # ---------------------------
-# Save Report
+# REPORTING (PROPER WAY)
 # ---------------------------
-timestamp = datetime.datetime.now().strftime("%Y-%m-%d %H:%M:%S")
-report_name = f"scan_{target.replace('.', '_')}.md"
-
-report_lines = [
-    "# ScanopyB Professional Scan Report",
-    f"Target: {target}",
-    f"Timestamp: {timestamp}",
-    f"Total Ports Scanned: {len(ports)}",
-    f"Scan Duration: {duration:.2f} seconds",
-    "",
-    "## Open Ports and Services"
-]
-
-if open_ports:
-    for port, service, banner in open_ports:
-        if banner:
-            report_lines.append(f"- Port {port}: {service} | {banner}")
-        else:
-            report_lines.append(f"- Port {port}: {service}")
-else:
-    report_lines.append("No open ports found.")
-
-if not os.path.exists("reports"):
-    os.makedirs("reports")
-
-with open(f"reports/{report_name}", "w") as f:
-    for line in report_lines:
-        f.write(line + "\n")
-
-print(f"Report saved to reports/{report_name}")
+reporter = ReportManager()
+reporter.save(target, ports, open_ports, duration)
