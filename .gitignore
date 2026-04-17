@@ -1,0 +1,6 @@
+﻿__pycache__/
+*.pyc
+*.log
+reports/*.md
+reports/*.json
+reports/*.csv
