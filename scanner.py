@@ -1,6 +1,8 @@
 import socket
 import datetime
+import os
 from concurrent.futures import ThreadPoolExecutor, as_completed
+from serviceDetect import detect_service
 
 print("==== ScanopyB Professional TCP Scanner ====")
 
@@ -43,15 +45,12 @@ def grab_banner(target, port):
         s.settimeout(1)
         s.connect((target, port))
 
-        # ---------------------------
         # HTTP detection
-        # ---------------------------
         if port in [80, 8080, 8000, 8888]:
             http_request = f"GET / HTTP/1.1\r\nHost: {target}\r\n\r\n"
             s.send(http_request.encode())
             response = s.recv(4096).decode(errors="ignore")
 
-            # Extract Server header if present
             for line in response.split("\r\n"):
                 if "Server:" in line:
                     s.close()
@@ -60,9 +59,6 @@ def grab_banner(target, port):
             s.close()
             return "HTTP service detected"
 
-        # ---------------------------
-        # Default banner grabbing
-        # ---------------------------
         banner = s.recv(1024).decode(errors="ignore").strip()
         s.close()
 
@@ -73,20 +69,25 @@ def grab_banner(target, port):
 
     except:
         return None
+
 # ---------------------------
 # Port Scan Function
 # ---------------------------
 def scan_port(port):
     try:
         s = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
-        s.settimeout(0.5)
+        s.settimeout(1)
         result = s.connect_ex((target, port))
         s.close()
+
         if result == 0:
+            service = detect_service(port)
             banner = grab_banner(target, port)
-            return (port, banner)
+            return (port, service, banner)
+
     except:
         return None
+
     return None
 
 # ---------------------------
@@ -101,10 +102,16 @@ with ThreadPoolExecutor(max_workers=100) as executor:
     futures = [executor.submit(scan_port, port) for port in ports]
     for future in as_completed(futures):
         result = future.result()
+
         if result:
-            port, banner = result
-            print(f"[+] Port {port} OPEN → {banner}")
-            open_ports.append((port, banner))
+            port, service, banner = result
+
+            if banner:
+                print(f"[+] Port {port} OPEN → {service} → {banner}")
+            else:
+                print(f"[+] Port {port} OPEN → {service}")
+
+            open_ports.append((port, service, banner))
 
 end_time = datetime.datetime.now()
 duration = (end_time - start_time).total_seconds()
@@ -129,13 +136,14 @@ report_lines = [
 ]
 
 if open_ports:
-    for port, banner in open_ports:
-        report_lines.append(f"- Port {port}: {banner}")
+    for port, service, banner in open_ports:
+        if banner:
+            report_lines.append(f"- Port {port}: {service} | {banner}")
+        else:
+            report_lines.append(f"- Port {port}: {service}")
 else:
     report_lines.append("No open ports found.")
 
-# Create reports folder if not exists
-import os
 if not os.path.exists("reports"):
     os.makedirs("reports")
 
