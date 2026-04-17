@@ -1,25 +1,51 @@
-# Advanced Port Scanner
+markdown
+# Network Service Scanner
 
-A fast, multi‑threaded port scanner with service detection, banner grabbing, and UDP support.  
-Built with Python for ethical network reconnaissance.
+A multi‑threaded TCP/UDP network scanner with service detection, banner grabbing, logging, and report generation. Built with Python for ethical network reconnaissance.
 
 ## Features
 
-- TCP connect scanning (multi‑threaded)
-- UDP scanning (with open/filtered detection)
-- Service detection (maps ports to common services)
-- Banner grabbing (extracts service banners)
-- Report generation: Markdown, JSON, CSV
-- Verbose mode and progress bar
-- Colourful terminal output
-
-## Why I built this
-
-I wanted to understand how tools like Nmap work under the hood. This project taught me about sockets, threading, network protocols, and how to structure a Python project.
+- ✅ TCP connect scanning (multi‑threaded)
+- ✅ UDP scanning (open/filtered detection)
+- ✅ Service detection (maps ports to common services)
+- ✅ Banner grabbing (extracts service banners)
+- ✅ Report generation: Markdown, JSON, CSV
+- ✅ Activity logging to file (`scanner.log`)
+- ✅ Verbose mode with real‑time output
+- ✅ Colourful terminal output with progress bar
 
 ## Installation
 
 ```bash
-git clone https://github.com/Amtul-kafi/PortScanner_project.git
-cd PortScanner_project
+git clone https://github.com/Amtul-kafi/Network-Service-Scanner.git
+cd Network-Service-Scanner
 pip install -r requirements.txt
+Usage
+bash
+# TCP scan
+py main.py -t scanme.nmap.org -p 22,80,443 -v
+
+# UDP scan
+py main.py -t scanme.nmap.org -p 53,123,161 -u -v
+
+# Full scan with JSON report
+py main.py -t 192.168.1.1 -p 1-1000 -T 200 -o json
+Arguments
+Argument	Description
+-t, --target	Target IP or hostname
+-p, --ports	Port range (e.g., 22,80,443 or 1-1000)
+-T, --threads	Number of threads (default: 100)
+-v, --verbose	Show detailed output
+--timeout	Socket timeout in seconds
+-o, --output	Report format: markdown, json, csv
+-u, --udp	Enable UDP scanning
+--no-banner	Disable banner grabbing (faster)
+--no-service	Disable service detection (faster)
+Example output
+Screenshot.png
+
+License
+MIT
+
+Author
+Amtul Kafi – GitHub
